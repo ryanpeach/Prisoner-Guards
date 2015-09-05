@@ -1,138 +1,85 @@
-class State:
-	def __init__(self, boatOnLeft=True, boatSize = 2, prisoners=(4,0), guards=(4,0)):
-		self.B = boatOnLeft
-		self.Z = boatSize
-		self.P = prisoners
-		self.G = guards
-		
-	def move(self, prisoners, guards):
-		if prisoners + guards <= self.Z:
-			if self.B:
-				newP = (self.P[0] - prisoners, self.P[1] + prisoners)
-				newG = (self.G[0] - guards,self.G[1] + guards)
-			else:
-				newP = (self.P[0] + prisoners, self.P[1] - prisoners)
-				newG = (self.G[0] + guards, self.G[1] - guards)
+import sys
+sys.path.insert(0,"E:\\OneDrive\\Documents\\School\\Masters of Science\\Knowledge-Based AI")
+from CoreLibrary import *
 
-		return ((not self.B,prisoners,guards),State(not self.B,self.Z,newP,newG),self)
-			
-	def locNum(self,loc):
-		i = 1
-		if loc:
-			i = 0
-		return i
-	
-	def test(self):
-		output = True;
-		for x in [0,1]:
-			if (self.P[x] > self.G[x] and self.G[x] != 0) or self.P[x] < 0 or self.G[x] < 0:
-				output = False;
-		return output
-	
-	def copy(self):
-		return State(self.B,self.Z,self.P,self.G)
-		
-	def __eq__(self, newState):
-		return newState.B == self.B and newState.G == self.G and newState.P == self.P and newState.Z == self.Z
+PL = "PL"
+PR = "PR"
+GL = "GL"
+GR = "GR"
+BL = "BL"
+S1 = "LastState"
+S2 = "CurrState"
 
-	def __hash__(self):
-		Z=sum(self.P)+sum(self.G)
-		return self.locNum(self.B)*Z^4+self.P[0]*Z^3+self.P[1]*Z^2+self.G[0]*Z^1+self.G[1]
+def Less(num1,num2):
+        if isinstance(num1, int) and isinstance(num2, int):
+                return num1 < num2
+        else:
+                raise TypeError, num1, num2
+def Eq(num1,num2):
+        if isinstance(num1, int) and isinstance(num2, int):
+                return num1 == num2
+        else:
+                raise TypeError, num1, num2
+def Real(num):
+        if isinstance(num, int):
+                return num >= 0
+        else:
+                raise TypeError, num
+def Moved(state1,state2,num):
+        L = state1[PL]+state1[GL]-state2[PL]-state2[GL]
+        R = state1[PR]+state1[GR]-state2[PR]-state2[GR]
+        return abs(L)==abs(R) and abs(L) == num and state1[BL] != state2[BL]
+class MoveLR(Operator):
+        def __init__(self):
+                self.NAME = "MoveLR"
+                Post2 = Sentence(Moved,(S1,S2,2)).disj(Moved,(S1,S2,1))
+                self.Post = Sentence(BL).neg().conj(Post2)
+                self.Pre  = Sentence(BL)
 
-	def __str__(self):
-		return repr((self.B,self.P,self.G))
-                
+        def _func(self, frame):
+                for n,m in [(1,0),(2,0),(1,1),(0,2),(0,1)]:
+                        newFrame = frame.copy()
+                        newFrame[PL] = frame[PL]-n
+                        newFrame[GL] = frame[GL]-m
+                        newFrame[PR] = frame[PR]+n
+                        newFrame[GR] = frame[GR]+m
+                        newFrame[BL] = not newFrame[BL]
+                        newFrame[S1] = frame
+                        newFrame[S2] = newFrame
+                        newFrame.NAME = ""
+                        yield newFrame
 
-class Generator:
-	def __init__(self, initState, tester):
-		self.S = initState
-		self.T = tester
-	
-	def generate(self):
-		for z in range(1,self.S.Z+1):
-			for x in range(0,z+1):
-				y = z - x
-				newMove = self.S.move(x,y)
-				if self.T.add(newMove):
-					#print newMove[1]
-					pass
-				if self.T.Victory:
-					return
-					
-class SemanticNet:
-	def __init__(self, initialState):
-		self.Graph = {initialState:[]}
-		self.WorkingMemory = [initialState]
-		
-	def addNode(self, newMove):
-		self.addLink(newMove)
-		self.Graph[newMove[1]] = []
-		self.WorkingMemory.append(newMove[1])
-		
-	def addLink(self, newMove):
-		self.Graph[newMove[2]].append(newMove[0:1])
-	
-	def search(self, newNode):
-		for node in self.Graph:
-			if node == newNode:
-				return (len(self.Graph[node]) == 0,True)
-		return (False,False)
-		
-	def pop(self):
-		return self.WorkingMemory
-		
-class Tester:
-	def __init__(self, net, goal):
-		self.G = net
-		self.W = goal
-		self.Victory = net.search(goal)[1]
-		
-	def add(self, newMove):
-		move = newMove[0]
-		state = newMove[1]
-		org = newMove[2]
-		
-		if self.goal(state):
-			self.Victory = True
-		
-		if state.test():
-			#print True
-			value, duplicate = self.G.search(state)
-			if not duplicate:
-				self.G.addNode(newMove)
-				return True
-			elif value:
-				self.G.addLink(newMove)
-				return True
-			else:
-				return False
-		else:
-			return False
-			
-	def goal(self, newNode):
-		if self.W == newNode:
-			self.Victory = True
-			return True
-		return False
+class MoveRL(Operator):
+        def __init__(self):
+                self.NAME = "MoveRL"
+                Post2 = Sentence(Moved,(S1,S2,2)).disj(Moved,(S1,S2,1))
+                self.Post = Sentence(BL).conj(Post2)
+                self.Pre  = Sentence(BL).neg()
 
-for U in range(2,50):			
-	Start = State(True, 3, (U,0), (U,0))
-	Finish = State(False, 3, (0,U), (0,U))
-	Net = SemanticNet(Start)
-	Test = Tester(Net, Finish)
+        def _func(self, frame):
+                for n,m in [(1,0),(2,0),(1,1),(0,2),(0,1)]:
+                        newFrame = frame.copy()
+                        newFrame[PR] = frame[PR]-n
+                        newFrame[GR] = frame[GR]-m
+                        newFrame[PL] = frame[PL]+n
+                        newFrame[GL] = frame[GL]+m
+                        newFrame[BL] = not newFrame[BL]
+                        newFrame[S1] = frame
+                        newFrame[S2] = newFrame
+                        newFrame.NAME = ""
+                        yield newFrame
 
-	CurrentNodes = [Start]
-	num = 0
-	try:
-		print "------ Gen " + str(U) + " -----------"
-		while not Test.Victory:
-			num += 1
-			source = Net.WorkingMemory.pop(0);
-			#print "------ Gen " + str(num) + " -----------"
-			#print "-- " + str(source) + " --"
-			Generator(source, Test).generate()
-		print "------ Itt. " + str(num) + " -----------"
-		print "--------------- Victory! ---------------"
+Init = Frame("Init", {PL: 3, PR:0, GL: 3, GR: 0, BL: True})
+Goal = Frame("", {PL: 0, PR:3, GL: 0, GR: 3, BL: False})
 
-	except IndexError:
-		print "---------- Failure... --------"
+Rule1 = Sentence(Less,(PR,GR)).disj(Eq,(PR,GR)).disj(Eq,(GR,0))
+Rule2 = Sentence(Less,(PL,GL)).disj(Eq,(PL,GL)).disj(Eq,(GL,0))
+Rule3 = Sentence(Real,PR).conj(Real,PL).conj(Real,GR).conj(Real,GL)
+Rules = [Rule1, Rule2, Rule3]
+
+Operators = [MoveLR(), MoveRL()]
+
+graph = Graph(Init)
+tst = Tester(graph, Rules)
+gen = Generator(graph, Operators)
+print generate_and_test(gen, tst, graph, Goal,20)
