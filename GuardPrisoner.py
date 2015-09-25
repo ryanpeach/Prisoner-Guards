@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0,"E:\\OneDrive\\Documents\\School\\Masters of Science\\Knowledge-Based AI")
+sys.path.insert(0,"C:\\Users\\ryanp\\OneDrive\\Documents\\School\\Masters of Science\\Knowledge-Based AI")
 from CoreLibrary import *
 
 PL = "PL"
